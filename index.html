@@ -18,8 +18,12 @@
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
 
-    <!-- Google Fonts: 圓體字型，比較可愛 -->
+    <!-- Google Fonts: 圓體字型 -->
     <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;700&display=swap" rel="stylesheet">
+
+    <!-- APP Icon (經典小豬版 - SVG Data URI) -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2220%22 fill=%22%23FEF08A%22/><circle cx=%2250%22 cy=%2250%22 r=%2235%22 fill=%22%232DD4BF%22/><path d=%22M70 45C70 45 75 35 70 30C65 25 55 30 55 30L50 35M35 55C35 55 30 60 30 65M45 65L45 75M65 65L65 75M75 50C75 61.0457 63.8071 70 50 70C36.1929 70 25 61.0457 25 50C25 38.9543 36.1929 30 50 30C63.8071 30 75 38.9543 75 50Z%22 fill=%22white%22 opacity=%220.9%22/><circle cx=%2240%22 cy=%2245%22 r=%222%22 fill=%22%23115E59%22/><circle cx=%2260%22 cy=%2245%22 r=%222%22 fill=%22%23115E59%22/><ellipse cx=%2250%22 cy=%2255%22 rx=%228%22 ry=%225%22 fill=%22%2314B8A6%22/><circle cx=%2247%22 cy=%2255%22 r=%221.5%22 fill=%22%23CCFBF1%22/><circle cx=%2253%22 cy=%2255%22 r=%221.5%22 fill=%22%23CCFBF1%22/></svg>">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2220%22 fill=%22%23FEF08A%22/><circle cx=%2250%22 cy=%2250%22 r=%2235%22 fill=%22%232DD4BF%22/><path d=%22M70 45C70 45 75 35 70 30C65 25 55 30 55 30L50 35M35 55C35 55 30 60 30 65M45 65L45 75M65 65L65 75M75 50C75 61.0457 63.8071 70 50 70C36.1929 70 25 61.0457 25 50C25 38.9543 36.1929 30 50 30C63.8071 30 75 38.9543 75 50Z%22 fill=%22white%22 opacity=%220.9%22/><circle cx=%2240%22 cy=%2245%22 r=%222%22 fill=%22%23115E59%22/><circle cx=%2260%22 cy=%2245%22 r=%222%22 fill=%22%23115E59%22/><ellipse cx=%2250%22 cy=%2255%22 rx=%228%22 ry=%225%22 fill=%22%2314B8A6%22/><circle cx=%2247%22 cy=%2255%22 r=%221.5%22 fill=%22%23CCFBF1%22/><circle cx=%2253%22 cy=%2255%22 r=%221.5%22 fill=%22%23CCFBF1%22/></svg>">
 
     <style>
         body {
@@ -101,18 +105,24 @@
             useEffect(() => {
                 const savedData = localStorage.getItem('savings_history_v1');
                 if (savedData) {
-                    const parsedHistory = JSON.parse(savedData);
-                    setHistory(parsedHistory);
-                    
-                    // 計算總金額
-                    const total = parsedHistory.reduce((acc, curr) => acc + curr.amount, 0);
-                    setTotalSaved(total);
+                    try {
+                        const parsedHistory = JSON.parse(savedData);
+                        if (Array.isArray(parsedHistory)) {
+                            setHistory(parsedHistory);
+                            
+                            // 計算總金額
+                            const total = parsedHistory.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+                            setTotalSaved(total);
 
-                    // 檢查今天是否已存
-                    const todayStr = new Date().toLocaleDateString('zh-TW');
-                    const todayRecord = parsedHistory.find(h => h.date === todayStr);
-                    if (todayRecord) {
-                        setTodayAmount(todayRecord.amount);
+                            // 檢查今天是否已存
+                            const todayStr = new Date().toLocaleDateString('zh-TW');
+                            const todayRecord = parsedHistory.find(h => h.date === todayStr);
+                            if (todayRecord) {
+                                setTodayAmount(todayRecord.amount);
+                            }
+                        }
+                    } catch (e) {
+                        console.error("資料讀取錯誤", e);
                     }
                 }
                 
@@ -133,53 +143,83 @@
 
             // 處理骰子點擊
             const handleDiceClick = () => {
-                // 如果今天已經存過，或正在滾動，或全部存完了
                 if (todayAmount !== null || isRolling || availableNumbers.length === 0) return;
 
                 setIsRolling(true);
 
-                // 模擬滾動延遲
                 setTimeout(() => {
                     const randomIndex = Math.floor(Math.random() * availableNumbers.length);
                     const luckyNumber = availableNumbers[randomIndex];
                     const todayStr = new Date().toLocaleDateString('zh-TW');
 
                     const newRecord = { date: todayStr, amount: luckyNumber, timestamp: new Date().getTime() };
-                    const newHistory = [newRecord, ...history]; // 新的在最前面
+                    const newHistory = [newRecord, ...history]; 
 
-                    // 更新狀態
                     setHistory(newHistory);
                     setTotalSaved(prev => prev + luckyNumber);
                     setTodayAmount(luckyNumber);
                     setIsRolling(false);
-                    setShowResultModal(true); // 顯示結果
+                    setShowResultModal(true); 
 
-                    // 存入 LocalStorage
                     localStorage.setItem('savings_history_v1', JSON.stringify(newHistory));
-                }, 1200); // 1.2秒動畫
+                }, 1200); 
+            };
+
+            // --- 資料管理功能 ---
+
+            // 匯出功能
+            const handleExport = () => {
+                const blob = new Blob([JSON.stringify(history)], {type: 'application/json'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `365存錢備份_${new Date().toISOString().slice(0,10)}.json`;
+                a.click();
+            };
+
+            // 匯入功能
+            const handleImport = (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const importedData = JSON.parse(e.target.result);
+                        if (Array.isArray(importedData)) {
+                            // 確認格式基本正確
+                            if(window.confirm(`確定要匯入 ${importedData.length} 筆資料嗎？這將會覆蓋您目前的紀錄。`)) {
+                                localStorage.setItem('savings_history_v1', JSON.stringify(importedData));
+                                alert("匯入成功！頁面將重新整理。");
+                                window.location.reload();
+                            }
+                        } else {
+                            alert("檔案格式錯誤，請確認這是正確的備份檔案。");
+                        }
+                    } catch (error) {
+                        alert("讀取檔案失敗，請重試。");
+                    }
+                };
+                reader.readAsText(file);
+                // 清空 input 讓同個檔案可以再次被選取
+                event.target.value = '';
             };
 
             // --- 數據呈現邏輯 ---
 
-            // 取得所有出現過的月份 (用於分頁標籤)
             const availableMonths = useMemo(() => {
                 const months = new Set();
-                // 始終加入當前月份，即使還沒存錢
                 const now = new Date();
                 months.add(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
 
                 history.forEach(h => {
-                    // 將 "2023/12/10" 這種格式轉換處理 (視瀏覽器 locale 而定，這裡做簡單處理)
-                    // 為了保險，我們直接用 timestamp 轉
                     const d = new Date(h.timestamp);
                     const m = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
                     months.add(m);
                 });
-                // 排序：新的月份在左邊
                 return Array.from(months).sort().reverse();
             }, [history]);
 
-            // 根據選中的月份過濾資料
             const filteredHistory = useMemo(() => {
                 return history.filter(h => {
                     const d = new Date(h.timestamp);
@@ -188,7 +228,6 @@
                 });
             }, [history, selectedMonth]);
 
-            // 格式化日期顯示 (顯示為 "10日 (週三)")
             const formatDateDisplay = (timestamp) => {
                 const d = new Date(timestamp);
                 const date = d.getDate();
@@ -221,7 +260,6 @@
                             </div>
                         </div>
                         
-                        {/* 進度條 */}
                         <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
                             <div 
                                 className="bg-teal-400 h-3 rounded-full transition-all duration-1000 ease-out"
@@ -236,9 +274,7 @@
 
                     {/* 中間互動區 (骰子) */}
                     <div className="flex-1 flex flex-col items-center justify-center py-10">
-                        
                         <div className="relative">
-                            {/* 骰子本體 */}
                             <button 
                                 onClick={handleDiceClick}
                                 disabled={todayAmount !== null}
@@ -267,7 +303,6 @@
                                 )}
                             </button>
                             
-                            {/* 裝飾光暈 */}
                             {!todayAmount && !isRolling && (
                                 <div className="absolute -inset-4 bg-teal-300 opacity-20 blur-xl rounded-full -z-10 animate-pulse"></div>
                             )}
@@ -283,29 +318,40 @@
                     {/* 底部紀錄區 */}
                     <div className="bg-white rounded-t-[2.5rem] shadow-[0_-5px_20px_rgba(0,0,0,0.05)] pb-8 overflow-hidden flex flex-col" style={{maxHeight: '45vh'}}>
                         
-                        {/* 標題與裝飾 */}
+                        {/* 標題與操作區 */}
                         <div className="pt-6 px-6 flex items-center justify-between mb-2">
                             <h3 className="font-bold text-slate-700 flex items-center gap-2">
                                 <Icon name="calendar-days" size={20} className="text-teal-500"/>
                                 存錢紀錄
                             </h3>
-                            {/* 匯出備份 (簡單版) */}
-                            <button 
-                                onClick={() => {
-                                    const blob = new Blob([JSON.stringify(history)], {type: 'application/json'});
-                                    const url = URL.createObjectURL(blob);
-                                    const a = document.createElement('a');
-                                    a.href = url;
-                                    a.download = `365存錢備份_${new Date().toISOString().slice(0,10)}.json`;
-                                    a.click();
-                                }}
-                                className="text-xs text-gray-400 hover:text-teal-500 underline"
-                            >
-                                下載備份
-                            </button>
+                            
+                            {/* 資料管理按鈕群組 (僅保留匯入與備份) */}
+                            <div className="flex gap-4 items-center">
+                                {/* 匯入 (隱藏 input) */}
+                                <label className="text-xs text-gray-400 hover:text-teal-600 cursor-pointer flex items-center gap-1 transition-colors" title="匯入紀錄">
+                                    <Icon name="upload" size={14} />
+                                    <span>匯入</span>
+                                    <input 
+                                        type="file" 
+                                        accept=".json" 
+                                        className="hidden" 
+                                        onChange={handleImport}
+                                    />
+                                </label>
+
+                                {/* 匯出 */}
+                                <button 
+                                    onClick={handleExport}
+                                    className="text-xs text-gray-400 hover:text-teal-600 flex items-center gap-1 transition-colors"
+                                    title="下載備份"
+                                >
+                                    <Icon name="download" size={14} />
+                                    <span>備份</span>
+                                </button>
+                            </div>
                         </div>
 
-                        {/* 月份選擇 Tabs (橫向捲動) */}
+                        {/* 月份選擇 Tabs */}
                         <div className="flex gap-3 overflow-x-auto px-6 py-2 hide-scrollbar mb-2 flex-shrink-0">
                             {availableMonths.map(month => (
                                 <button
@@ -323,7 +369,7 @@
                             ))}
                         </div>
 
-                        {/* 列表內容 (可捲動區) */}
+                        {/* 列表內容 */}
                         <div className="flex-1 overflow-y-auto px-6 pb-20">
                             {filteredHistory.length === 0 ? (
                                 <div className="text-center py-10 text-gray-300">
@@ -333,14 +379,12 @@
                             ) : (
                                 <div className="grid grid-cols-1 gap-3">
                                     {filteredHistory.map((item, idx) => {
-                                        // 計算這是第幾筆紀錄 (因為 history 是新的在前面，所以要倒過來算)
                                         const fullIndex = history.findIndex(h => h.timestamp === item.timestamp);
                                         const cumulativeCount = history.length - fullIndex;
 
                                         return (
                                         <div key={item.timestamp} className="flex items-center justify-between p-4 bg-yellow-50/50 rounded-xl border border-yellow-100 hover:border-yellow-200 transition-colors">
                                             <div className="flex items-center gap-3">
-                                                {/* 這裡原本顯示日期，現在改為顯示「第幾筆」 */}
                                                 <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-teal-500 shadow-sm font-bold text-sm">
                                                     {cumulativeCount}
                                                 </div>
@@ -360,7 +404,7 @@
                         </div>
                     </div>
 
-                    {/* 彈出視窗 Modal (今日結果) */}
+                    {/* Result Modal */}
                     {showResultModal && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
                             <div className="bg-white w-full max-w-sm rounded-[2rem] p-8 text-center shadow-2xl transform scale-100 transition-all">
